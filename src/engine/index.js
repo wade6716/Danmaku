@@ -43,8 +43,13 @@ export default function(framing, setup, render, remove) {
     setup(this._.stage, pendingList);
     for (i = 0; i < pendingList.length; i++) {
       cmt = pendingList[i];
-      cmt.y = allocate.call(this, cmt);
-      this._.runningList.push(cmt);
+      var yPos = allocate.call(this, cmt);
+      if (yPos >= 0) {
+        cmt.y = yPos;
+        this._.runningList.push(cmt);
+      } else {
+        remove(this._.stage, cmt);
+      }
     }
     for (i = 0; i < this._.runningList.length; i++) {
       cmt = this._.runningList[i];

@@ -2,7 +2,7 @@
   typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
   typeof define === 'function' && define.amd ? define(factory) :
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Danmaku = factory());
-}(this, (function () { 'use strict';
+})(this, (function () { 'use strict';
 
   var transform = (function() {
     /* istanbul ignore next */
@@ -44,13 +44,13 @@
     return node;
   }
 
-  function init() {
+  function init$2() {
     var stage = document.createElement('div');
     stage.style.cssText = 'overflow:hidden;white-space:nowrap;transform:translateZ(0);';
     return stage;
   }
 
-  function clear(stage) {
+  function clear$2(stage) {
     var lc = stage.lastChild;
     while (lc) {
       stage.removeChild(lc);
@@ -58,16 +58,16 @@
     }
   }
 
-  function resize(stage, width, height) {
+  function resize$2(stage, width, height) {
     stage.style.width = width + 'px';
     stage.style.height = height + 'px';
   }
 
-  function framing() {
+  function framing$1() {
     //
   }
 
-  function setup(stage, comments) {
+  function setup$1(stage, comments) {
     var df = document.createDocumentFragment();
     var i = 0;
     var cmt = null;
@@ -86,12 +86,12 @@
     }
   }
 
-  function render(stage, cmt) {
+  function render$1(stage, cmt) {
     cmt.node.style[transform] = 'translate(' + cmt.x + 'px,' + cmt.y + 'px)';
   }
 
   /* eslint no-invalid-this: 0 */
-  function remove(stage, cmt) {
+  function remove$1(stage, cmt) {
     stage.removeChild(cmt.node);
     /* istanbul ignore else */
     if (!this.media) {
@@ -101,13 +101,13 @@
 
   var domEngine = {
     name: 'dom',
-    init: init,
-    clear: clear,
-    resize: resize,
-    framing: framing,
-    setup: setup,
-    render: render,
-    remove: remove,
+    init: init$2,
+    clear: clear$2,
+    resize: resize$2,
+    framing: framing$1,
+    setup: setup$1,
+    render: render$1,
+    remove: remove$1,
   };
 
   var dpr = typeof window !== 'undefined' && window.devicePixelRatio || 1;
@@ -219,22 +219,22 @@
     stage.style.height = height + 'px';
   }
 
-  function framing$1(stage) {
+  function framing(stage) {
     stage.context.clearRect(0, 0, stage.width, stage.height);
   }
 
-  function setup$1(stage, comments) {
+  function setup(stage, comments) {
     for (var i = 0; i < comments.length; i++) {
       var cmt = comments[i];
       cmt.canvas = createCommentCanvas(cmt, stage._fontSize);
     }
   }
 
-  function render$1(stage, cmt) {
+  function render(stage, cmt) {
     stage.context.drawImage(cmt.canvas, cmt.x * dpr, cmt.y * dpr);
   }
 
-  function remove$1(stage, cmt) {
+  function remove(stage, cmt) {
     // avoid caching canvas to reduce memory usage
     cmt.canvas = null;
   }
@@ -244,10 +244,10 @@
     init: init$1,
     clear: clear$1,
     resize: resize$1,
-    framing: framing$1,
-    setup: setup$1,
-    render: render$1,
-    remove: remove$1,
+    framing: framing,
+    setup: setup,
+    render: render,
+    remove: remove,
   };
 
   var raf = (function() {
@@ -326,60 +326,85 @@
   /* eslint no-invalid-this: 0 */
   function allocate(cmt) {
     var that = this;
+    var mode = cmt.mode || 'rtl';
     var ct = this.media ? this.media.currentTime : now() / 1000;
-    function willCollide(cr, cmt) {
-      if (cmt.mode === 'top' || cmt.mode === 'bottom') {
-        return ct - cr.time < that._.duration;
-      }
-      // `ct`, `cr.time` and `that._.duration` all live on the same timeline
-      // (media time when bound to a media element, wall-clock time otherwise),
-      // so `ct - cr.time` is already the elapsed travelling time on it.
-      // Scaling it by `playbackRate` would count the rate twice.
-      var crTotalWidth = that._.width + cr.width;
-      var crElapsed = crTotalWidth * (ct - cr.time) / that._.duration;
-      if (cr.width > crElapsed) {
-        return true;
-      }
-      // (rtl mode) the right end of `cr` move out of left side of stage
-      var crLeftTime = that._.duration + cr.time - ct;
-      var cmtTotalWidth = that._.width + cmt.width;
-      var cmtTime = that.media ? cmt.time : cmt._utc;
-      var cmtElapsed = cmtTotalWidth * (ct - cmtTime) / that._.duration;
-      var cmtArrival = that._.width - cmtElapsed;
-      // (rtl mode) the left end of `cmt` reach the left side of stage
-      var cmtArrivalTime = that._.duration * cmtArrival / (that._.width + cmt.width);
-      return crLeftTime > cmtArrivalTime;
+
+    // 单行基准高度（字号加上合理的行间距与上下 padding）
+    var fontHeight = cmt.height || 28;
+    var trackHeight = Math.ceil(fontHeight * 1.25);
+    if (trackHeight < 24) {
+      trackHeight = 24;
     }
-    var crs = this._.space[cmt.mode];
-    var last = 0;
-    var curr = 0;
-    for (var i = 1; i < crs.length; i++) {
-      var cr = crs[i];
-      var requiredRange = cmt.height;
-      if (cmt.mode === 'top' || cmt.mode === 'bottom') {
-        requiredRange += cr.height;
+
+    // 计算当前容器高度下能容纳的严格整数轨道总数（杜绝上下行半截重叠）
+    var maxTracks = Math.max(1, Math.floor(this._.height / trackHeight));
+
+    if (!this._.tracks) {
+      this._.tracks = {};
+    }
+    if (!this._.tracks[mode] || this._.tracks[mode].length !== maxTracks) {
+      var old = this._.tracks[mode] || [];
+      this._.tracks[mode] = [];
+      for (var k = 0; k < maxTracks; k++) {
+        this._.tracks[mode][k] = old[k] || null;
       }
-      if (cr.range - cr.height - crs[last].range >= requiredRange) {
-        curr = i;
+    }
+
+    var safeGap = 24; // 24px 入场安全车距
+
+    // B 站时空双重防撞断言：检测后车 cmt 与前车 last 在同一轨道上是否会碰撞
+    function willCollide(last, cmt) {
+      if (mode === 'top' || mode === 'bottom') {
+        return ct - last.time < that._.duration;
+      }
+      // 统一同屏时间模型：前车走完全程耗时 duration，位移与时间成正比
+      var lastTotalWidth = that._.width + last.width;
+      var lastElapsed = lastTotalWidth * (ct - last.time) / that._.duration;
+
+      // 1. 入场安全断言：后车入场时，前车尾部必须已完全进入屏幕右侧，且留出 safeGap
+      if (lastElapsed < last.width + safeGap) {
+        return true; // 入场碰撞
+      }
+
+      // 2. 途中追尾预测：若后车文本较长，其滑行速度比前车快，需预测中途是否会超车追尾
+      if (cmt.width > last.width) {
+        var lastRemainingTime = that._.duration - (ct - last.time); // 前车离屏剩余时间
+        var catchDistance = lastElapsed - (last.width + safeGap); // 当前车距
+        var relativeSpeed = (cmt.width - last.width) / that._.duration; // 相对速度 (px/s)
+        var catchTime = catchDistance / relativeSpeed; // 追上所需时间
+        if (catchTime < lastRemainingTime) {
+          return true; // 屏幕内部中途必定追尾
+        }
+      }
+
+      return false; // 安全可用
+    }
+
+    var chosenTrack = -1;
+    for (var i = 0; i < maxTracks; i++) {
+      var lastCmt = this._.tracks[mode][i];
+      if (!lastCmt || !willCollide(lastCmt, cmt)) {
+        chosenTrack = i;
         break;
       }
-      if (willCollide(cr, cmt)) {
-        last = i;
-      }
     }
-    var channel = crs[last].range;
-    var crObj = {
-      range: channel + cmt.height,
-      time: this.media ? cmt.time : cmt._utc,
+
+    // 饱和拦截：若所有可用轨道均会追尾或满载，直接丢弃该弹幕（B站防重叠硬拦截）
+    if (chosenTrack === -1) {
+      return -1;
+    }
+
+    this._.tracks[mode][chosenTrack] = {
+      time: ct,
       width: cmt.width,
       height: cmt.height
     };
-    crs.splice(last + 1, curr - last - 1, crObj);
 
-    if (cmt.mode === 'bottom') {
-      return this._.height - cmt.height - channel % this._.height;
+    // 严格网格对齐计算 Y 轴坐标，杜绝浮点和半行错位
+    if (mode === 'bottom') {
+      return this._.height - trackHeight - chosenTrack * trackHeight;
     }
-    return channel % (this._.height - cmt.height);
+    return chosenTrack * trackHeight;
   }
 
   /* eslint no-invalid-this: 0 */
@@ -424,8 +449,13 @@
       setup(this._.stage, pendingList);
       for (i = 0; i < pendingList.length; i++) {
         cmt = pendingList[i];
-        cmt.y = allocate.call(this, cmt);
-        this._.runningList.push(cmt);
+        var yPos = allocate.call(this, cmt);
+        if (yPos >= 0) {
+          cmt.y = yPos;
+          this._.runningList.push(cmt);
+        } else {
+          remove(this._.stage, cmt);
+        }
       }
       for (i = 0; i < this._.runningList.length; i++) {
         cmt = this._.runningList[i];
@@ -516,7 +546,7 @@
   }
 
   /* eslint-disable no-invalid-this */
-  function init$2(opt) {
+  function init(opt) {
     this._ = {};
     this.container = opt.container || document.createElement('div');
     this.media = opt.media;
@@ -645,14 +675,15 @@
   }
 
   /* eslint-disable no-invalid-this */
-  function clear$2() {
+  function clear() {
     this._.engine.clear(this._.stage, this._.runningList);
     this._.runningList = [];
+    this._.tracks = {};
     return this;
   }
 
   /* eslint-disable no-invalid-this */
-  function resize$2() {
+  function resize() {
     this._.width = this.container.offsetWidth;
     this._.height = this.container.offsetHeight;
     this._.engine.resize(this._.stage, this._.width, this._.height);
@@ -680,7 +711,7 @@
   };
 
   function Danmaku(opt) {
-    opt && init$2.call(this, opt);
+    opt && init.call(this, opt);
   }
   Danmaku.prototype.destroy = function() {
     return destroy.call(this);
@@ -695,13 +726,13 @@
     return hide.call(this);
   };
   Danmaku.prototype.clear = function() {
-    return clear$2.call(this);
+    return clear.call(this);
   };
   Danmaku.prototype.resize = function() {
-    return resize$2.call(this);
+    return resize.call(this);
   };
   Object.defineProperty(Danmaku.prototype, 'speed', speed);
 
   return Danmaku;
 
-})));
+}));

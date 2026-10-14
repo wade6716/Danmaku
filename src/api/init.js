@@ -13,18 +13,14 @@ export default function(opt) {
   this._.visible = true;
 
   /* eslint-disable no-undef */
-  /* istanbul ignore next */
-  if (process.env.ENGINE === 'dom') {
+  var envEngine = typeof process !== 'undefined' && process.env ? process.env.ENGINE : undefined;
+  if (envEngine === 'dom') {
     this.engine = 'dom';
     this._.engine = domEngine;
-  }
-  /* istanbul ignore next */
-  if (process.env.ENGINE === 'canvas') {
+  } else if (envEngine === 'canvas') {
     this.engine = 'canvas';
     this._.engine = canvasEngine;
-  }
-  /* istanbul ignore else */
-  if (!process.env.ENGINE) {
+  } else {
     this.engine = (opt.engine || 'DOM').toLowerCase();
     this._.engine = this.engine === 'canvas' ? canvasEngine : domEngine;
   }
@@ -33,6 +29,11 @@ export default function(opt) {
 
   this._.speed = Math.max(0, opt.speed) || 144;
   this._.duration = 4;
+  this._.area = typeof opt.area === 'number' ? Math.min(1.0, Math.max(0.1, opt.area)) : 1.0;
+  this._.bottomMargin = typeof opt.bottomMargin === 'number' ? Math.max(0, opt.bottomMargin) : 48;
+  this._.opacity = typeof opt.opacity === 'number' ? Math.min(1.0, Math.max(0.0, opt.opacity)) : 1.0;
+  this._.offset = typeof opt.offset === 'number' ? opt.offset : 0;
+  this._.maxLines = typeof opt.maxLines === 'number' ? Math.max(0, Math.floor(opt.maxLines)) : 0;
 
   this.comments = opt.comments || [];
   this.comments.sort(function(a, b) {
@@ -45,7 +46,7 @@ export default function(opt) {
   this._.position = 0;
 
   this._.paused = true;
-  if (this.media) {
+  if (this.media && typeof this.media.addEventListener === 'function') {
     this._.listener = {};
     bindEvents.call(this, this._.listener);
   }

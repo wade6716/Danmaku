@@ -28,6 +28,7 @@ export function canvasHeight(font, fontSize) {
 }
 
 export function createCommentCanvas(cmt, fontSize) {
+  var dpr = typeof window !== 'undefined' && window.devicePixelRatio || 1;
   if (typeof cmt.render === 'function') {
     var cvs = cmt.render();
     if (cvs instanceof HTMLCanvasElement) {
@@ -50,8 +51,8 @@ export function createCommentCanvas(cmt, fontSize) {
     Math.max(1, Math.ceil(ctx.measureText(cmt.text).width) + strokeWidth * 2);
   cmt.height = cmt.height ||
     Math.ceil(canvasHeight(style.font, fontSize)) + strokeWidth * 2;
-  canvas.width = cmt.width * dpr;
-  canvas.height = cmt.height * dpr;
+  canvas.width = Math.ceil(cmt.width * dpr);
+  canvas.height = Math.ceil(cmt.height * dpr);
   ctx.scale(dpr, dpr);
   for (var key in style) {
     ctx[key] = style[key];
@@ -76,10 +77,15 @@ export function createCommentCanvas(cmt, fontSize) {
 }
 
 function computeFontSize(el) {
-  return window
-    .getComputedStyle(el, null)
-    .getPropertyValue('font-size')
-    .match(/(.+)px/)[1] * 1;
+  if (!el || typeof window === 'undefined') return 16;
+  try {
+    var computed = window.getComputedStyle(el, null);
+    var fs = computed ? computed.getPropertyValue('font-size') : '';
+    var m = fs && fs.match(/(\d+(?:\.\d+)?)px/);
+    return m ? parseFloat(m[1]) : 16;
+  } catch (e) {
+    return 16;
+  }
 }
 
 export function init(container) {
@@ -101,14 +107,19 @@ export function clear(stage, comments) {
 }
 
 export function resize(stage, width, height) {
-  stage.width = width * dpr;
-  stage.height = height * dpr;
+  var dpr = typeof window !== 'undefined' && window.devicePixelRatio || 1;
+  stage.width = Math.ceil(width * dpr);
+  stage.height = Math.ceil(height * dpr);
   stage.style.width = width + 'px';
   stage.style.height = height + 'px';
 }
 
-export function framing(stage) {
+export function framing(stage, opacity) {
   stage.context.clearRect(0, 0, stage.width, stage.height);
+  var alpha = typeof opacity === 'number' ? opacity : (this && this._ ? this._.opacity : 1);
+  if (typeof alpha === 'number') {
+    stage.context.globalAlpha = alpha;
+  }
 }
 
 export function setup(stage, comments) {
@@ -119,6 +130,7 @@ export function setup(stage, comments) {
 }
 
 export function render(stage, cmt) {
+  var dpr = typeof window !== 'undefined' && window.devicePixelRatio || 1;
   stage.context.drawImage(cmt.canvas, cmt.x * dpr, cmt.y * dpr);
 }
 

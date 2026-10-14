@@ -13,8 +13,18 @@ export default function(cmt) {
     trackHeight = 24;
   }
 
-  // 计算当前容器高度下能容纳的严格整数轨道总数（杜绝上下行半截重叠）
-  var maxTracks = Math.max(1, Math.floor(this._.height / trackHeight));
+  var area = typeof this._.area === 'number' ? Math.min(1.0, Math.max(0.1, this._.area)) : 1.0;
+  var bottomMargin = typeof this._.bottomMargin === 'number' ? Math.max(0, this._.bottomMargin) : 48;
+
+  // 计算当前容器高度下避开底部字幕区后的可用高度
+  var usableHeight = Math.max(trackHeight, this._.height - bottomMargin);
+  var maxValidHeight = Math.max(trackHeight, usableHeight * area);
+
+  // 计算当前区域限制下能容纳的严格整数轨道总数（杜绝上下行半截重叠）
+  var maxTracks = Math.max(1, Math.floor(maxValidHeight / trackHeight));
+  if (typeof this._.maxLines === 'number' && this._.maxLines > 0) {
+    maxTracks = Math.min(maxTracks, this._.maxLines);
+  }
 
   if (!this._.tracks) {
     this._.tracks = {};
@@ -77,9 +87,10 @@ export default function(cmt) {
     height: cmt.height
   };
 
-  // 严格网格对齐计算 Y 轴坐标，杜绝浮点和半行错位
+  // 严格网格对齐计算 Y 轴坐标
   if (mode === 'bottom') {
-    return this._.height - trackHeight - chosenTrack * trackHeight;
+    // 底部弹幕：从避让字幕线 (this._.height - bottomMargin) 向上堆叠
+    return this._.height - bottomMargin - trackHeight - chosenTrack * trackHeight;
   }
   return chosenTrack * trackHeight;
 }
